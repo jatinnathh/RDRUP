@@ -62,6 +62,7 @@ export default function Home() {
   const [selectedSiteFilter, setSelectedSiteFilter] = useState<string>("all");
   const [copiedWebhookId, setCopiedWebhookId] = useState<string | null>(null);
   const [origin, setOrigin] = useState<string>("");
+  const [sitesLoading, setSitesLoading] = useState<boolean>(true);
 
   const sitesRef = useRef(sites);
   const isRunningRef = useRef(isRunning);
@@ -79,42 +80,25 @@ export default function Home() {
     intervalMinutesRef.current = intervalMinutes;
   }, [intervalMinutes]);
 
-  // Load state on mount
+  // Load sites from server-side JSON file on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
       setOrigin(window.location.origin);
-      
-      const savedSites = localStorage.getItem("render_pinger_sites");
-      if (savedSites) {
-        try {
-          const parsed = JSON.parse(savedSites);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setSites(parsed);
-          } else {
-            // Default sample site if empty
-            setSites([
-              {
-                id: "dsagent-sample",
-                name: "DS Agent Backend",
-                url: "https://dsagent.onrender.com",
-                enabled: true,
-              },
-            ]);
-          }
-        } catch {
-          // fallback
-        }
-      } else {
-        setSites([
-          {
-            id: "dsagent-sample",
-            name: "DS Agent Backend",
-            url: "https://dsagent.onrender.com",
-            enabled: true,
-          },
-        ]);
-      }
+    }
 
+    // Fetch sites from /api/sites (reads data/sites.json)
+    fetch("/api/sites")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setSites(data);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setSitesLoading(false));
+
+    // Logs remain in localStorage (display-only, not needed by cron)
+    if (typeof window !== "undefined") {
       const savedLogs = localStorage.getItem("render_pinger_logs");
       if (savedLogs) {
         try {
@@ -126,13 +110,15 @@ export default function Home() {
     }
   }, []);
 
-  // Save sites to localStorage
-  const saveSitesToStorage = (updatedSites: TargetSite[]) => {
+  // Save sites to server-side JSON file
+  const saveSitesToStorage = useCallback((updatedSites: TargetSite[]) => {
     setSites(updatedSites);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("render_pinger_sites", JSON.stringify(updatedSites));
-    }
-  };
+    fetch("/api/sites", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updatedSites),
+    }).catch(() => {});
+  }, []);
 
   // Ping a single site
   const pingSingleSite = useCallback(async (site: TargetSite) => {
@@ -568,7 +554,17 @@ export default function Home() {
             </div>
           </div>
 
-          {sites.length === 0 ? (
+          {sitesLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[1, 2].map((i) => (
+                <div key={i} className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-5 shadow-lg animate-pulse">
+                  <div className="h-4 bg-zinc-800 rounded w-1/3 mb-3" />
+                  <div className="h-3 bg-zinc-800 rounded w-2/3 mb-6" />
+                  <div className="h-8 bg-zinc-800 rounded w-full" />
+                </div>
+              ))}
+            </div>
+          ) : sites.length === 0 ? (
             <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-8 text-center text-zinc-400">
               <AlertCircle className="w-8 h-8 text-zinc-600 mx-auto mb-2" />
               <p>No backend sites added yet. Add a site above to begin keeping it alive.</p>
