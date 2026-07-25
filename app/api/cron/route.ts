@@ -69,20 +69,40 @@ async function pingUrl(site: Site) {
 }
 
 export async function GET(request: Request) {
-  // Secure with CRON_SECRET if set
+  const { searchParams } = new URL(request.url);
   const authHeader = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  
+  if (cronSecret && authHeader !== `Bearer ${cronSecret}` && searchParams.get("secret") !== cronSecret) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const allSites = await readSites();
-  const activeSites = allSites.filter((s) => s.enabled);
+  const customUrls = searchParams.get("urls") || searchParams.get("url");
+  let activeSites: Site[] = [];
+
+  if (customUrls) {
+    const urlsArr = customUrls.split(",").map((u) => u.trim()).filter(Boolean);
+    activeSites = urlsArr.map((url, i) => {
+      let targetUrl = url;
+      if (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://")) {
+        targetUrl = `https://${targetUrl}`;
+      }
+      return {
+        id: `custom-${i}`,
+        name: new URL(targetUrl).hostname,
+        url: targetUrl,
+        enabled: true,
+      };
+    });
+  } else {
+    const allSites = await readSites();
+    activeSites = allSites.filter((s) => s.enabled);
+  }
 
   if (activeSites.length === 0) {
     return NextResponse.json({
       success: true,
-      message: "No active sites to ping.",
+      message: "No active sites to ping. Add sites to data/sites.json or pass ?urls=https://your-site.onrender.com",
       timestamp: new Date().toISOString(),
       pinged: 0,
       results: [],
@@ -101,4 +121,8 @@ export async function GET(request: Request) {
     pinged: results.length,
     results,
   });
+}
+
+export async function POST(request: Request) {
+  return GET(request);
 }

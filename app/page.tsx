@@ -61,6 +61,7 @@ export default function Home() {
   const [logs, setLogs] = useState<PingLog[]>([]);
   const [selectedSiteFilter, setSelectedSiteFilter] = useState<string>("all");
   const [copiedWebhookId, setCopiedWebhookId] = useState<string | null>(null);
+  const [copiedGlobalCron, setCopiedGlobalCron] = useState<boolean>(false);
   const [origin, setOrigin] = useState<string>("");
   const [sitesLoading, setSitesLoading] = useState<boolean>(true);
 
@@ -311,6 +312,13 @@ export default function Home() {
     setTimeout(() => setCopiedWebhookId(null), 2000);
   };
 
+  const handleCopyGlobalCron = () => {
+    const url = `${origin || "http://localhost:3000"}/api/cron`;
+    navigator.clipboard.writeText(url);
+    setCopiedGlobalCron(true);
+    setTimeout(() => setCopiedGlobalCron(false), 2000);
+  };
+
   const activeSites = sites.filter((s) => s.enabled);
   const successLogs = logs.filter((l) => l.success);
   const successRate = logs.length > 0 ? Math.round((successLogs.length / logs.length) * 100) : 100;
@@ -501,6 +509,55 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        {/* 24/7 Always-On Setup Info Card */}
+        <section className="bg-gradient-to-r from-indigo-950/40 via-zinc-900/80 to-zinc-900/80 border border-indigo-500/30 rounded-xl p-6 shadow-xl relative overflow-hidden">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="space-y-1 max-w-2xl">
+              <div className="flex items-center space-x-2">
+                <ShieldCheck className="w-5 h-5 text-indigo-400" />
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-indigo-300">
+                  24/7 Background Pinging (Works When Tab Is Closed)
+                </h2>
+              </div>
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                <span className="font-semibold text-white">Why does browser pinging pause?</span> Vercel serverless apps run browser timers only while this tab is open. Vercel Free Hobby tier limits native background cron jobs to 1/day.
+              </p>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                To ping <strong>24/7 every 14 minutes automatically without keeping any browser tabs open</strong>, set up a free 1-minute cron at <a href="https://cron-job.org" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline inline-flex items-center font-medium">cron-job.org <ExternalLink className="w-3 h-3 ml-0.5" /></a> pointing to your endpoint below:
+              </p>
+            </div>
+
+            <div className="w-full md:w-auto flex flex-col sm:flex-row gap-2 shrink-0">
+              <button
+                onClick={handleCopyGlobalCron}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium py-2.5 px-4 rounded-lg flex items-center justify-center space-x-2 transition cursor-pointer border border-indigo-400/30"
+              >
+                {copiedGlobalCron ? (
+                  <>
+                    <Check className="w-4 h-4 text-emerald-300" />
+                    <span>Global Cron Endpoint Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" />
+                    <span>Copy 24/7 Cron URL</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-indigo-500/20 text-xs font-mono text-zinc-400 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <span className="truncate">
+              Endpoint: <span className="text-indigo-300">{origin || "https://rdrup.vercel.app"}/api/cron</span>
+            </span>
+            <span className="text-emerald-400 flex items-center shrink-0 font-sans text-xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block mr-1.5 animate-pulse" />
+              Ready for 24/7 external trigger
+            </span>
+          </div>
+        </section>
 
         {/* Add New Site Form Card */}
         <section className="bg-zinc-900/70 border border-zinc-800 rounded-xl p-6 shadow-xl">
